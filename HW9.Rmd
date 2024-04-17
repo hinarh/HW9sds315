@@ -88,7 +88,7 @@ plot_matched_distribution <- function(data, variable) {
          x = variable,
          y = "Count") +
     theme_minimal() +
-    scale_fill_manual(values = c("#FFA500", "#6495ED"), labels = c("Received GOTV Call", "Did not receive GOTV Call")) +
+    scale_fill_manual(values = c("orange", "lightblue"), labels = c("Received GOTV Call", "Did not receive GOTV Call")) +
     guides(fill = guide_legend(title = "GOTV Call"))
 }
 
