@@ -1,0 +1,157 @@
+---
+title: "HW9"
+author: "Nihar Harkare"
+date: "2024-04-15"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(mosaic)
+library(tidyverse)
+library(MatchIt)
+library(moderndive)
+```
+
+[https://github.com/hinarh/HW9sds315](https://github.com/hinarh/HW9sds315)
+
+# Problem 1
+
+## Part A
+
+```{r echo=FALSE}
+turnout = read_csv("turnout.csv", show_col_types = FALSE)
+```
+
+```{r echo=FALSE}
+gotv_call_recipients <- subset(turnout, GOTV_call == 1)
+proportion_voted_1998 <- mean(gotv_call_recipients$voted1998)
+```
+
+The proportion of those receiving a GOTV call who voted in 1998 is `r round(proportion_voted_1998, 4)`.
+
+```{r echo=FALSE}
+no_gotv_call_recipients <- subset(turnout, GOTV_call == 0)
+proportion_voted_1998_no_gotv <- mean(no_gotv_call_recipients$voted1998)
+```
+
+The sample proportion of those not receiving a GOTV call who voted in 1998 is `r round(proportion_voted_1998_no_gotv, 4)`.
+
+```{r echo=FALSE}
+model <- glm(voted1998 ~ GOTV_call, data = turnout, family = binomial)
+conf_interval <- confint(model, "GOTV_call", level = 0.95)
+```
+
+95% Confidence Interval for the difference in proportions: `r round(conf_interval[1], 4)` to `r round(conf_interval[2], 4)`.
+
+## Part B
+
+```{r echo=FALSE}
+plot_bar <- function(data, variable, group) {
+  data <- data %>%
+    group_by(!!sym(variable), !!sym(group)) %>%
+    summarise(count = n()) %>%
+    spread(key = !!sym(group), value = count, fill = 0) %>%
+    mutate(prop_received_gotv = `1` / (`1` + `0`),
+           prop_no_gotv = `0` / (`1` + `0`)) %>%
+    gather(key = "GOTV_call", value = "count", prop_received_gotv, prop_no_gotv)
+
+  ggplot(data, aes(x = !!sym(variable), y = count, fill = GOTV_call)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(title = paste("Distribution of", variable, "by", group), x = variable, y = "Count") +
+    scale_fill_manual(values = c("orange", "blue"), labels = c("Received GOTV Call", "Did not receive GOTV Call")) +
+    guides(fill = guide_legend(title = "GOTV Call"))
+}
+
+plot_bar(turnout, "voted1996", "GOTV_call")
+plot_bar(turnout, "AGE", "GOTV_call")
+plot_bar(turnout, "MAJORPTY", "GOTV_call")
+```
+
+With the barplots, we can see that the people who did not vote in 1996 were more likely than not to revcieve a GOTV call. Additionally, we can see that older people were more likely than not to recieve a GOTV call and people who were not associated with a party were more likely to recieve a GOTV call, meaning that this is how these variables confound the results.
+
+## Part C
+
+```{r echo=FALSE}
+matched_data = matchit(GOTV_call ~ AGE + MAJORPTY + voted1996, data = turnout, ratio=5)
+matched_dataset <- match.data(matched_data)
+
+plot_matched_distribution <- function(data, variable) {
+  ggplot(data, aes(x = !!sym(variable), fill = as.factor(GOTV_call))) +
+    geom_bar(position = "dodge") +
+    labs(title = paste("Distribution of", variable, "in the Matched Dataset"),
+         x = variable,
+         y = "Count") +
+    theme_minimal() +
+    scale_fill_manual(values = c("#FFA500", "#6495ED"), labels = c("Received GOTV Call", "Did not receive GOTV Call")) +
+    guides(fill = guide_legend(title = "GOTV Call"))
+}
+
+plot_matched_distribution(matched_dataset, "voted1996")
+plot_matched_distribution(matched_dataset, "AGE")
+plot_matched_distribution(matched_dataset, "MAJORPTY")
+```
+
+Using these graphs, we can see that voted1996, AGE, and MAJORPTY are no longer confounders for the matched data.
+
+```{r echo=FALSE}
+proportion_voted_1998_matched <- mean(matched_dataset$voted1998[matched_dataset$GOTV_call == 1])
+
+proportion_voted_1998_no_gotv_matched <- mean(matched_dataset$voted1998[matched_dataset$GOTV_call == 0])
+
+contingency_table <- table(matched_dataset$GOTV_call, matched_dataset$voted1998)
+
+conf_interval_matched <- confint(prop.test(contingency_table))
+```
+
+We can see that the proportion who received the GOTV call (which was `r round(proportion_voted_1998_matched, 4)`) in the matched dataset is higher that those who did not recieve the call (which was `r round(proportion_voted_1998_no_gotv_matched, 4)`), meaning more people who received the call voted in the 1998 election, however, this was also the case in the unmatched data, but to a lesser difference, with a confidence interval of 95% we got values with a lower of `r round(conf_interval_matched$lower, 4)` and an upper limit of `r round(conf_interval_matched$upper, 4)`.
+
+# Problem 2
+
+## Part A
+
+```{r echo=FALSE}
+solder = read_csv("solder.csv", show_col_types = FALSE)
+
+ggplot(solder, aes(x = Opening, y = skips)) +
+  geom_boxplot(fill = "blue") +
+  labs(x = "Size of Opening on Solder Gun", y = "Number of Skips", title = "Relationship between Opening and Skips")
+```
+
+As we can see in the plots, as the size of the opening on the solder gun decreases, we can see a larger number of skips. Furthermore, the distribution also becomes more skewed towards greater values of skips.
+
+```{r echo=FALSE}
+ggplot(solder, aes(x = Solder, y = skips)) +
+  geom_boxplot(fill = "orange") +
+  labs(x = "Thickness of Alloy Used for Soldering", y = "Number of Skips", title = "Relationship between Solder Thickness and Skips")
+```
+
+As we can see, the thinner alloy resulted in a larger number of skips, and the boxplot also became more skewed towards the greater number of skips as well, in contrast to the thicker alloy with a lower number of skips.
+
+## Part B
+
+```{r echo=FALSE}
+model <- lm(skips ~ Opening + Solder + Opening:Solder + Opening * Solder, data = solder)
+
+coefficients_table <- data.frame(
+  Coefficient = names(coef(model)),
+  Estimate = coef(model),
+  Lower_CI = confint(model)[,1],
+  Upper_CI = confint(model)[,2]
+)
+
+print(coefficients_table)
+```
+
+## Part C
+
+The intercept of 0.3933 means that when there is a small opening and a thick solder, the number of skips is 0.3933. The coefficient of 2.4067 means that there is a medium opening and thick solder, and we have 0.3933 + 2.407 = 2.8 skips. The coefficient of 5.1267 means that there is a small opening and thick solder, and we have 0.3933 + 5.1267 = 5.52 skips. The coefficient of 2.28 means that there is a medium opening and thin solder, and we have 0.3933 + 2.28 = 2.6733 skips. The coefficient of -0.74 means that there is an interaction between the medium opening and thin solder, and we have 0.3933 - 0.74 = 0 skips. The coefficient of 9.6533 means that there is an interaction between the small opening and thin solder, and we have 0.3933 + 9.6533 = 10.0466 skips.
+
+## Part D
+
+Based on these coefficients, I would recommend using a medium size solder opening with a thin solder alloy thickness. This combination appears to result in a lower mount of skips because its coefficient of regression between medium opening size and thin solder is negative.
